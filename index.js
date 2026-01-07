@@ -31,6 +31,8 @@ async function run() {
     // await client.connect();
     const db = client.db("bookShop");
     const bookCollection = db.collection("books");
+    const userRoleCollection = db.collection("user");
+    const addtoCartCollection = db.collection("addToCartBoks");
 
     // all books get api
     app.get("/books", async (req, res) => {
@@ -79,6 +81,99 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await bookCollection.deleteOne(query);
       res.send(result);
+    });
+
+    // user create
+    app.post("/user", async (req, res) => {
+      const newUser = req.body;
+      newUser.role = "user";
+      newUser.createdAt = new Date();
+      const email = newUser.email;
+      const userExist = await userRoleCollection.findOne({ email });
+      if (userExist) {
+        return res.send({ message: "user Exists" });
+      }
+      const result = await userRoleCollection.insertOne(newUser);
+      res.send(result);
+    });
+
+    // get single user
+    app.get("/user", async (req, res) => {
+      const email = req.query.email;
+      const result = await userRoleCollection.findOne({ email });
+      res.send(result);
+    });
+
+    //  add to cart
+    app.post("/addToCart", async (req, res) => {
+      const newAddToCart = req.body;
+      const result = await addtoCartCollection.insertOne(newAddToCart);
+      res.send(result);
+    });
+
+    // my carts/product
+    app.get("/getAllCartItem", async (req, res) => {
+      const email = req.query.email;
+      const cartItems = await addtoCartCollection
+        .find({ userEmail: email })
+        .toArray();
+      res.send(cartItems);
+    });
+
+    // delete book
+    app.delete("/myBook/:id", async (req, res) => {
+      const id = req.params.id;
+      const email = req.query.email;
+
+      const query = {
+        _id: new ObjectId(id),
+        userEmail: email,
+      };
+      const result = await addtoCartCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // get all request book i mean add to cart all data
+    app.get("/requestAllBook", async (req, res) => {
+      const cursor = addtoCartCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    //admin approve book api
+    app.patch("/approveBook/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await addtoCartCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: "approved",
+            approvedAt: new Date(),
+          },
+        }
+      );
+      res.send({
+        success: true,
+        message: "Book request approved",
+      });
+    });
+
+    //admin reject book api
+    app.patch("/rejectBook/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await addtoCartCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: "reject",
+            rejectAt: new Date(),
+          },
+        }
+      );
+      res.send({
+        success: true,
+        message: "Book request reject",
+      });
     });
 
     // Send a ping to confirm a successful connection
